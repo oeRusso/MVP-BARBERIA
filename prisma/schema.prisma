@@ -6,3 +6,234 @@ generator client {
   provider = "prisma-client"
   output   = "../src/generated/prisma"
 }
+
+// Autenticación (nombres de modelos y campos definidos por Better Auth)
+
+model User {
+  id            String    @id
+  name          String
+  email         String    @unique
+  emailVerified Boolean   @default(false)
+  image         String?   @db.Text
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+  phone         String?
+  isAdmin       Boolean   @default(false)
+  sessions      Session[]
+  accounts      Account[]
+  barber        Barber?
+  bookings      Booking[]
+}
+
+model Session {
+  id        String   @id
+  expiresAt DateTime
+  token     String   @unique
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  ipAddress String?
+  userAgent String?  @db.Text
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+}
+
+model Account {
+  id                    String    @id
+  accountId             String
+  providerId            String
+  userId                String
+  user                  User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  accessToken           String?   @db.Text
+  refreshToken          String?   @db.Text
+  idToken               String?   @db.Text
+  accessTokenExpiresAt  DateTime?
+  refreshTokenExpiresAt DateTime?
+  scope                 String?   @db.Text
+  password              String?
+  createdAt             DateTime  @default(now())
+  updatedAt             DateTime  @updatedAt
+
+  @@index([userId])
+}
+
+model Verification {
+  id         String   @id
+  identifier String
+  value      String   @db.Text
+  expiresAt  DateTime
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  @@index([identifier])
+}
+
+// Barberos
+
+model Barber {
+  id          String       @id @default(cuid())
+  userId      String       @unique
+  user        User         @relation(fields: [userId], references: [id], onDelete: Restrict)
+  displayName String
+  bio         String?      @db.Text
+  active      Boolean      @default(true)
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+  services    Service[]
+  workPeriods WorkPeriod[]
+  timeOff     TimeOff[]
+  bookings    Booking[]
+  slots       BookingSlot[]
+}
+
+model Service {
+  id        String        @id @default(cuid())
+  barberId  String
+  barber    Barber        @relation(fields: [barberId], references: [id], onDelete: Cascade)
+  name      String
+  /// Precio en pesos enteros.
+  price     Int
+  blocks    Int           @default(1)
+  active    Boolean       @default(true)
+  createdAt DateTime      @default(now())
+  updatedAt DateTime      @updatedAt
+  items     BookingItem[]
+
+  @@index([barberId])
+}
+
+/// Tramo semanal de trabajo, en minutos desde las 00:00 de Argentina.
+model WorkPeriod {
+  id           String @id @default(cuid())
+  barberId     String
+  barber       Barber @relation(fields: [barberId], references: [id], onDelete: Cascade)
+  /// 0 es domingo y 6 es sábado.
+  weekday      Int
+  startMinutes Int
+  endMinutes   Int
+
+  @@index([barberId, weekday])
+}
+
+/// Horario, día o feriado bloqueado por el barbero.
+model TimeOff {
+  id        String   @id @default(cuid())
+  barberId  String
+  barber    Barber   @relation(fields: [barberId], references: [id], onDelete: Cascade)
+  startsAt  DateTime
+  endsAt    DateTime
+  reason    String?
+  createdAt DateTime @default(now())
+
+  @@index([barberId, startsAt])
+}
+
+// Turnos
+
+enum BookingStatus {
+  PENDING_DEPOSIT
+  CONFIRMED
+  COMPLETED
+  NO_SHOW
+  CANCELLED
+  EXPIRED
+}
+
+enum DepositStatus {
+  PENDING
+  PAID
+  NOT_REQUIRED
+  REFUND_DUE
+  REFUNDED
+  RETAINED
+}
+
+enum PaymentMethod {
+  MERCADO_PAGO
+  CASH
+}
+
+enum BookingSource {
+  ONLINE
+  MANUAL
+}
+
+enum CancelledBy {
+  CLIENT
+  STAFF
+}
+
+model Booking {
+  id              String        @id @default(cuid())
+  barberId        String
+  barber          Barber        @relation(fields: [barberId], references: [id], onDelete: Restrict)
+  /// Vacío en los turnos cargados a mano.
+  clientId        String?
+  client          User?         @relation(fields: [clientId], references: [id], onDelete: SetNull)
+  clientName      String
+  clientPhone     String
+  startsAt        DateTime
+  blocks          Int
+  /// Precio y seña en pesos enteros, copiados al reservar.
+  price           Int
+  deposit         Int
+  status          BookingStatus
+  depositStatus   DepositStatus
+  paymentMethod   PaymentMethod?
+  paymentDeadline DateTime?
+  source          BookingSource
+  cancelledBy     CancelledBy?
+  cancelledAt     DateTime?
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+  items           BookingItem[]
+  slots           BookingSlot[]
+  payments        Payment[]
+
+  @@index([barberId, startsAt])
+  @@index([clientId, status])
+  @@index([status, paymentDeadline])
+}
+
+/// Servicio incluido en el turno, copiado para conservar nombre y precio.
+model BookingItem {
+  id        String   @id @default(cuid())
+  bookingId String
+  booking   Booking  @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+  serviceId String?
+  service   Service? @relation(fields: [serviceId], references: [id], onDelete: SetNull)
+  name      String
+  price     Int
+  blocks    Int
+
+  @@index([bookingId])
+}
+
+/// Bloque ocupado. El índice único garantiza que no haya reservas duplicadas.
+model BookingSlot {
+  id        String   @id @default(cuid())
+  barberId  String
+  barber    Barber   @relation(fields: [barberId], references: [id], onDelete: Restrict)
+  bookingId String
+  booking   Booking  @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+  startsAt  DateTime
+
+  @@unique([barberId, startsAt])
+  @@index([bookingId])
+}
+
+/// Pago recibido. El índice único evita procesar dos veces un mismo pago.
+model Payment {
+  id                String   @id @default(cuid())
+  bookingId         String
+  booking           Booking  @relation(fields: [bookingId], references: [id], onDelete: Restrict)
+  providerPaymentId String   @unique
+  /// Monto en pesos enteros.
+  amount            Int
+  status            String
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  @@index([bookingId])
+}

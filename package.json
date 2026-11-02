@@ -13,11 +13,12 @@
     "db:up": "podman start barberia-mysql || podman run -d --name barberia-mysql -p 127.0.0.1:3307:3306 -e MYSQL_ROOT_PASSWORD=barberia_dev -e MYSQL_DATABASE=barberia -v barberia-mysql-data:/var/lib/mysql docker.io/library/mysql:8.4",
     "db:down": "podman stop barberia-mysql",
     "db:generate": "prisma generate",
-    "db:migrate": "prisma migrate dev"
+    "db:migrate": "prisma migrate dev && prisma generate"
   },
   "dependencies": {
     "@prisma/adapter-mariadb": "7.10.1",
     "@prisma/client": "7.10.1",
+    "better-auth": "^1.7.15",
     "dotenv": "^18.0.9",
     "mariadb": "^3.5.4",
     "next": "16.4.3",
@@ -34,11 +35,13 @@
     "eslint": "^9",
     "eslint-config-next": "16.4.3",
     "tailwindcss": "^4",
+    "tsx": "^4.23.15",
     "typescript": "^5",
     "vitest": "^5.0.5"
   },
   "allowScripts": {
     "@prisma/engines@7.10.1": true,
-    "prisma@7.10.1": true
+    "prisma@7.10.1": true,
+    "esbuild@0.28.2": true
   }
 }
