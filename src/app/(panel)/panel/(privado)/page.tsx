@@ -15,6 +15,7 @@ import {
   formatDay,
   formatMoney,
   formatTime,
+  whatsappLink,
 } from "@/lib/format";
 import { prisma } from "@/server/db";
 import { selectedBarber } from "@/server/panel";
@@ -36,12 +37,6 @@ const ERRORS: Record<string, string> = {
   estado: "Ese turno ya cambió de estado. Revisá la agenda.",
   horario: "Ese horario no está disponible.",
 };
-
-function whatsappLink(phone: string, name: string, when: string) {
-  const digits = phone.replace(/\D/g, "");
-  const message = `Hola ${name}, te escribimos de Chachi's Barber por tu turno del ${when}.`;
-  return `https://wa.me/${digits}?text=${encodeURIComponent(message)}`;
-}
 
 export default async function AgendaPage({
   searchParams,
@@ -143,8 +138,10 @@ export default async function AgendaPage({
           {refundsDue.map((booking) => (
             <div key={booking.id} className={`${noticeClass} flex flex-col gap-2`}>
               <p>
-                Devolver {formatMoney(booking.deposit)} a {booking.clientName} en
-                Mercado Pago.
+                Devolver {formatMoney(booking.deposit)} a {booking.clientName}
+                {booking.paymentMethod === "MERCADO_PAGO"
+                  ? " en Mercado Pago."
+                  : " en efectivo."}
               </p>
               <form action={refundDone.bind(null, booking.id)}>
                 <button className={secondaryButtonClass}>Ya la devolví</button>
@@ -198,8 +195,7 @@ export default async function AgendaPage({
                 <a
                   href={whatsappLink(
                     booking.clientPhone,
-                    booking.clientName,
-                    formatDateTime(booking.startsAt),
+                    `Hola ${booking.clientName}, te escribimos de Chachi's Barber por tu turno del ${formatDateTime(booking.startsAt)}.`,
                   )}
                   target="_blank"
                   rel="noreferrer"

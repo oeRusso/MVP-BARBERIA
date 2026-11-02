@@ -26,5 +26,10 @@ export const auth = betterAuth({
       isAdmin: { type: "boolean", required: false, input: false },
     },
   },
+  // Detrás del túnel de Cloudflare, la IP real solo llega en este encabezado.
+  // Sin esto, el límite de intentos trataría a todos como un mismo visitante.
+  advanced: {
+    ipAddress: { ipAddressHeaders: ["cf-connecting-ip"] },
+  },
   plugins: [nextCookies()],
 });

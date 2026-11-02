@@ -1,0 +1,12 @@
+.git
+.github
+.next
+node_modules
+src/generated
+docs
+deploy
+.env
+.env.*
+!.env.example
+*.log
+*.md

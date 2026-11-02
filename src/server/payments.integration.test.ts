@@ -2,7 +2,11 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 import { toInstant } from "@/lib/booking/time";
 
-import { createOnlineBooking, expireOverdueBookings } from "./bookings";
+import {
+  createOnlineBooking,
+  expireOverdueBookings,
+  rescheduleBooking,
+} from "./bookings";
 import {
   cancelByClient,
   cancelByStaff,
@@ -286,6 +290,39 @@ describe("cambios de estado", () => {
     const booking = await bookingById(bookingId);
     expect(booking.status).toBe("NO_SHOW");
     expect(booking.depositStatus).toBe("RETAINED");
+  });
+
+  it("reprogramar después de una ausencia recupera la seña", async () => {
+    const { bookingId } = await paidBooking();
+    await closeBooking(bookingId, "NO_SHOW");
+
+    const target = nextStart();
+    expect((await rescheduleBooking(bookingId, target, now)).ok).toBe(true);
+
+    const booking = await bookingById(bookingId);
+    expect(booking.startsAt).toEqual(target);
+    expect(booking.status).toBe("CONFIRMED");
+    expect(booking.depositStatus).toBe("PAID");
+    expect(await prisma.bookingSlot.count({ where: { bookingId } })).toBe(1);
+  });
+
+  it("reprogramar a un horario ocupado conserva el turno original", async () => {
+    const { bookingId } = await paidBooking();
+    const original = await bookingById(bookingId);
+    const occupied = nextStart();
+    await book(occupied);
+
+    expect(await rescheduleBooking(bookingId, occupied, now)).toEqual({
+      ok: false,
+      error: "SLOT_UNAVAILABLE",
+    });
+
+    expect((await bookingById(bookingId)).startsAt).toEqual(original.startsAt);
+    expect(
+      await prisma.bookingSlot.count({
+        where: { bookingId, startsAt: original.startsAt },
+      }),
+    ).toBe(1);
   });
 
   it("el barbero confirma una seña en efectivo", async () => {

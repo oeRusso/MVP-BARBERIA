@@ -37,6 +37,17 @@ export function clockToMinutes(clock: string): number | null {
   return Number(match[1]) * 60 + Number(match[2]);
 }
 
+/**
+ * Arma el enlace de WhatsApp. Los clientes escriben su número como en
+ * Argentina, sin código de país, y wa.me necesita el formato internacional.
+ */
+export function whatsappLink(phone: string, message: string): string {
+  const digits = phone.replace(/\D/g, "");
+  const isInternational = phone.trim().startsWith("+") || digits.startsWith("54");
+  const number = isInternational ? digits : `549${digits.replace(/^0/, "")}`;
+  return `https://wa.me/${number}?text=${encodeURIComponent(message)}`;
+}
+
 /** Días reservables, desde hoy hasta el límite indicado. */
 export function nextDays(now: Date, count: number) {
   const today = toLocal(now).date;
