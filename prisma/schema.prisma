@@ -232,6 +232,8 @@ model Payment {
   /// Monto en pesos enteros.
   amount            Int
   status            String
+  /// Pago tardío o duplicado que hay que devolver a mano en Mercado Pago.
+  needsRefund       Boolean  @default(false)
   createdAt         DateTime @default(now())
   updatedAt         DateTime @updatedAt
 

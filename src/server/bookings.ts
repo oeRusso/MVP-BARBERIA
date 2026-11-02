@@ -352,6 +352,41 @@ export async function createManualBooking({
   });
 }
 
+/**
+ * Mueve un turno a otro horario conservando la seña. Solo lo usa el personal,
+ * y también sirve para recuperar a un cliente que no se presentó.
+ */
+export async function rescheduleBooking(
+  bookingId: string,
+  start: Date,
+  now: Date,
+): Promise<BookingResult> {
+  return runBooking(async (tx) => {
+    await tx.$queryRaw`SELECT id FROM Booking WHERE id = ${bookingId} FOR UPDATE`;
+    const booking = await tx.booking.findUnique({ where: { id: bookingId } });
+    if (!booking || !["CONFIRMED", "NO_SHOW"].includes(booking.status)) {
+      throw new BookingFailure("SLOT_UNAVAILABLE");
+    }
+
+    const blocks = bookingBlocks(start, booking.blocks);
+    await tx.bookingSlot.deleteMany({ where: { bookingId } });
+    await releaseOverdueSlots(tx, booking.barberId, blocks, now);
+    await assertFree(tx, booking.barberId, start, booking.blocks, now);
+    await occupySlots(tx, booking.barberId, bookingId, blocks);
+
+    await tx.booking.update({
+      where: { id: bookingId },
+      data: {
+        startsAt: start,
+        status: "CONFIRMED",
+        depositStatus:
+          booking.depositStatus === "RETAINED" ? "PAID" : booking.depositStatus,
+      },
+    });
+    return bookingId;
+  });
+}
+
 /** Vence los turnos sin seña cuyo plazo terminó y libera sus bloques. */
 export async function expireOverdueBookings(now: Date): Promise<number> {
   return prisma.$transaction(async (tx) => {
