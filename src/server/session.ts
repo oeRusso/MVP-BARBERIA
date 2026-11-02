@@ -40,6 +40,14 @@ export async function requireStaff() {
   return { user, actor };
 }
 
+export async function requireAdmin() {
+  const staff = await requireStaff();
+  if (!staff.actor.isAdmin) {
+    redirect("/panel");
+  }
+  return staff;
+}
+
 export async function requireBarberAccess(barberId: string) {
   const staff = await requireStaff();
   if (!canManageBarber(staff.actor, barberId)) {

@@ -100,8 +100,8 @@ export function BookingForm({
         method,
         phone,
       });
-      setError(result.error);
-      if (date) {
+      if (result?.error) {
+        setError(result.error);
         refreshSlots(date, serviceIds);
       }
     });
