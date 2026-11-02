@@ -20,9 +20,10 @@ coverage/
 .env.*
 !.env.example
 
-# backups locales de la base
+# backups locales de la base; las migraciones sí se versionan
 *.sql
 *.sql.gz
+!prisma/migrations/**/*.sql
 
 # herramientas locales
 .claude/settings.local.json
