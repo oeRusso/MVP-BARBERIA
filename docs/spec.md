@@ -97,6 +97,7 @@ El dueño puede ser administrador y barbero a la vez.
 - Zona horaria de Argentina y una sola sucursal.
 - Horario inicial de lunes a domingo, de 10:00 a 22:00, con descanso de 12:00 a 13:00. Cada barbero puede cambiarlo.
 - Los bloques duran 45 minutos: 40 de servicio más 5 de preparación.
+- La grilla es la misma para todos los barberos, contada desde las 10:00. Si un horario empieza fuera de la grilla, el primer turno es el bloque siguiente: quien empieza a las 14:00 atiende desde las 14:30.
 - Un turno debe terminar antes del descanso o del cierre.
 - Con el horario inicial son 14 bloques por barbero: 10:00 y 10:45 a la mañana, y de 13:00 a 21:15 a la tarde.
 - No se puede bloquear un horario con turno: primero hay que reprogramarlo o cancelarlo.
