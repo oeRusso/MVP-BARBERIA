@@ -7,5 +7,7 @@ export default defineConfig({
   test: {
     environment: "node",
     include: ["src/**/*.test.ts"],
+    setupFiles: ["dotenv/config"],
+    testTimeout: 30_000,
   },
 });

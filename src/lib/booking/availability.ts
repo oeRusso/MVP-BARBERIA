@@ -66,32 +66,36 @@ function overlaps(start: Date, end: Date, busy: BusyInterval[]): boolean {
   return busy.some((interval) => start < interval.end && interval.start < end);
 }
 
-type AvailableStartsInput = {
+type FreeStartsInput = {
   date: LocalDate;
   periods: WorkPeriod[];
   blocks: number;
   busy: BusyInterval[];
-  now: Date;
 };
 
-/** Horarios reservables de un barbero para un día y una cantidad de bloques. */
-export function availableStarts({
+/** Horarios libres según la agenda; es lo que usa la carga manual. */
+export function freeStarts({
   date,
   periods,
   blocks,
   busy,
-  now,
-}: AvailableStartsInput): Date[] {
+}: FreeStartsInput): Date[] {
   return periods.flatMap((period) => {
     const lastStart = period.end - blocks * BLOCK_MINUTES;
 
     return gridStarts(period)
       .filter((minutes) => minutes <= lastStart)
       .map((minutes) => toInstant(date, minutes))
-      .filter(
-        (start) =>
-          checkBookingWindow(start, now) === null &&
-          !overlaps(start, bookingEnd(start, blocks), busy),
-      );
+      .filter((start) => !overlaps(start, bookingEnd(start, blocks), busy));
   });
+}
+
+/** Horarios que un cliente puede reservar online. */
+export function availableStarts({
+  now,
+  ...input
+}: FreeStartsInput & { now: Date }): Date[] {
+  return freeStarts(input).filter(
+    (start) => checkBookingWindow(start, now) === null,
+  );
 }
