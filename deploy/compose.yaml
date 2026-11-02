@@ -1,0 +1,64 @@
+name: barberia
+
+services:
+  mysql:
+    image: mysql:8.4
+    restart: unless-stopped
+    environment:
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:?falta en .env}
+      MYSQL_DATABASE: barberia
+      MYSQL_USER: barberia
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD:?falta en .env}
+    command: ["--innodb-buffer-pool-size=256M"]
+    volumes:
+      - mysql-data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD-SHELL", "mysqladmin ping -h 127.0.0.1 -uroot -p$$MYSQL_ROOT_PASSWORD --silent"]
+      interval: 5s
+      timeout: 5s
+      retries: 30
+
+  migrate:
+    image: ghcr.io/oerusso/mvp-barberia-tools:${IMAGE_TAG:-latest}
+    env_file: .env
+    depends_on:
+      mysql:
+        condition: service_healthy
+    restart: "no"
+
+  app:
+    image: ghcr.io/oerusso/mvp-barberia:${IMAGE_TAG:-latest}
+    restart: unless-stopped
+    env_file: .env
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+
+  # Vence cada minuto los turnos sin seña y libera sus horarios.
+  cron:
+    image: curlimages/curl:8.18.0
+    restart: unless-stopped
+    environment:
+      CRON_SECRET: ${CRON_SECRET:?falta en .env}
+    entrypoint: ["sh", "-c"]
+    command:
+      - |
+        while true; do
+          curl -fsS -X POST -H "Authorization: Bearer $$CRON_SECRET" http://app:3000/api/cron/expirar > /dev/null || echo "fallo el vencimiento de turnos"
+          sleep 60
+        done
+    depends_on:
+      - app
+
+  # Publica la app sin abrir puertos web en el servidor.
+  cloudflared:
+    image: cloudflare/cloudflared:2026.10.7
+    restart: unless-stopped
+    command: ["tunnel", "--no-autoupdate", "run"]
+    environment:
+      TUNNEL_TOKEN: ${TUNNEL_TOKEN:?falta en .env}
+    depends_on:
+      - app
+
+volumes:
+  mysql-data:

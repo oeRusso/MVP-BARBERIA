@@ -5,6 +5,7 @@ on:
     branches: [development]
   pull_request:
     branches: [main]
+  workflow_call:
 
 permissions:
   contents: read
@@ -28,8 +29,8 @@ jobs:
           --health-timeout=5s
           --health-retries=20
     steps:
-      - uses: actions/checkout@v5
-      - uses: actions/setup-node@v5
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
         with:
           node-version: 24
           cache: npm

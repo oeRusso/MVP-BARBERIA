@@ -1,0 +1,63 @@
+name: Despliegue
+
+on:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+  packages: write
+
+jobs:
+  verificar:
+    uses: ./.github/workflows/ci.yml
+
+  imagenes:
+    needs: verificar
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: docker/login-action@v4
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - uses: docker/build-push-action@v7
+        with:
+          context: .
+          target: app
+          push: true
+          tags: |
+            ghcr.io/oerusso/mvp-barberia:latest
+            ghcr.io/oerusso/mvp-barberia:${{ github.sha }}
+      - uses: docker/build-push-action@v7
+        with:
+          context: .
+          target: tools
+          push: true
+          tags: |
+            ghcr.io/oerusso/mvp-barberia-tools:latest
+            ghcr.io/oerusso/mvp-barberia-tools:${{ github.sha }}
+
+  # Se activa con la variable DEPLOY_ENABLED=true cuando el VPS esté listo.
+  servidor:
+    needs: imagenes
+    if: vars.DEPLOY_ENABLED == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - name: Configurar SSH
+        env:
+          SSH_KEY: ${{ secrets.VPS_SSH_KEY }}
+          KNOWN_HOSTS: ${{ secrets.VPS_KNOWN_HOSTS }}
+        run: |
+          install -m 700 -d ~/.ssh
+          printf '%s\n' "$SSH_KEY" > ~/.ssh/id_ed25519
+          printf '%s\n' "$KNOWN_HOSTS" > ~/.ssh/known_hosts
+          chmod 600 ~/.ssh/id_ed25519
+      - name: Actualizar el servidor
+        env:
+          TARGET: ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }}
+        run: |
+          scp deploy/compose.yaml deploy/backup.sh deploy/restore-test.sh "$TARGET:/opt/barberia/"
+          ssh "$TARGET" "cd /opt/barberia && export IMAGE_TAG=${{ github.sha }} && docker compose pull && docker compose up -d --remove-orphans && docker image prune -f"
